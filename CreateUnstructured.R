@@ -12,9 +12,6 @@ SP <- SimParam$new(founderPop)
 SP$addTraitAEG(10, mean=8.8)
 SP$setVarE(h2=0.25)
 
-SP$addTraitA(5, mean=35)
-SP$setVarE(h2=0.8)
-
 ## randomly cross 200 parents 
 Parents = newPop(founderPop)
 F1 = randCross(Parents, 200)
@@ -49,10 +46,30 @@ PYT = self(PYTSel, nProgeny = 2)
 PYT = setPheno(PYT, reps=2)
 
 newGen = self(PYT)
-nGen=100
-for (x in 1:nGen){
+nGen=10
+while (x < nGen){
   newGen = self(newGen)
+  nGen = x+1
 }
+
+sample = sample(100:200,1)
+npops = 10
+y=1
+for (n in 1:npops)  {
+popname <- selectInd(newGen, 5)
+  while (y < sample){
+    popname = self(popname, nProgeny=30)
+    y=y+1
+    }
+assign(paste0("pop",n), popname)
+}
+
+pops = list(pop1,pop2,pop3,pop4,pop5,pop6,pop7,pop8,pop9,pop10)
+
+sample(100:200,1)
+parents = selectInd(pops$y,5)
+parents2 = selectInd(pops$z,5)
+newpop = randcross2(parents, parents2)
 
 
 
