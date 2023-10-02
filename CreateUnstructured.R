@@ -1,4 +1,5 @@
 library(AlphaSimR)
+library(writexl)
 
 genMap <- readRDS("data/genMapSNPs.RData")
 haplotypes <- readRDS("data/haplotypesSNPs.RData")
@@ -11,6 +12,7 @@ founderPop = newMapPop(genMap,
 SP <- SimParam$new(founderPop)
 SP$addTraitAEG(10, mean=8.8)
 SP$setVarE(h2=0.25)
+SP$setSexes("yes_rand")
 
 ## randomly cross 200 parents 
 Parents = newPop(founderPop)
@@ -45,31 +47,70 @@ PYTSel = selectFam(F5, 16, use="pheno", top=TRUE)
 PYT = self(PYTSel, nProgeny = 2)
 PYT = setPheno(PYT, reps=2)
 
+# We will now advance elites to create an unstructured population
+
 newGen = self(PYT)
-nGen=10
+
+nGen= sample(20:50, 1) # advance a random number of generations between 20 and 50
+x=1
 while (x < nGen){
-  newGen = self(newGen)
-  nGen = x+1
+  newGen = self(newGen, nProgeny=5)
+  x = x+1
 }
 
-sample = sample(100:200,1)
-npops = 10
+pops = list()
+npops = sample(3:7,1) # create a random number of subpopulations between 3 and 7
+selfGen = sample(50:100,1) # self the subpops for a random number of Gen between 50 and 100
 y=1
 for (n in 1:npops)  {
 popname <- selectInd(newGen, 5)
-  while (y < sample){
-    popname = self(popname, nProgeny=30)
+  while (y < selfGen){
+    popname = self(popname, nProgeny=10)
     y=y+1
     }
-assign(paste0("pop",n), popname)
+pops[[n]] = assign(paste0("pop",n), popname)
 }
 
-pops = list(pop1,pop2,pop3,pop4,pop5,pop6,pop7,pop8,pop9,pop10)
+newpoplist = list()
+nMigrations = sample(50:100,1) #select a random number of intermigrations
+for (m in 1:nMigrations){
+y = sample(1:npops,1) #randomly choose pop1
+z = sample(1:npops,1) #randomly choose pop2
+parents = selectInd(pops[[y]],3) #select migratin gparents
+parents2 = selectInd(pops[[x]],3) #select migrating parents  
+newpop = hybridCross(parents, parents2,) #cross migrating parents 
+newpoplist[[m]] = assign(paste0("newPop",m), newpop) #collect new pops in a list
+  }
 
-sample(100:200,1)
-parents = selectInd(pops$y,5)
-parents2 = selectInd(pops$z,5)
-newpop = randcross2(parents, parents2)
+finalpoplist = list()
+gen = sample(50:100,1) #self new pops for a random number of generations 
+g = 1
+p = 1
+while (p < npops){
+  pop = newpoplist[[p]]
+  popAdv = self(pop, nprogeny=5)
+  p = p+1
+  while (g < gen) {
+  popAdv = self(popAdv)
+    g = g+1
+    }
+  finalpoplist[[p]] = assign(paste0("finalpop",p),popAdv)
+  }
 
+trainX = list()
+trainY = list()
+z = 2
+while (z < npops){
+  getData = finalpoplist[[z]]
+  geno = pullSegSiteGeno(getData)
+  pheno = pheno(getData)
+  trainX[[z]] = assign(paste0("genopop",z),geno)
+  trainY[[z]] = assign(paste0("phenopop",z),pheno)
+  z = z+1
+}
 
+trainingGeno = do.call(rbind, trainX)
+trainingPheno = do.call(rbind,trainY)
 
+write_xlsx(trainingGeno,"trainingGeno.xlsx")
+write_xlsx(trainingPheno,"trainingPheno.xlsx")
