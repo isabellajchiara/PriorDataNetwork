@@ -1,8 +1,6 @@
-library(AlphaSimR)
-library(writexl)
 
-genMap <- readRDS("data/genMapSNPs.RData")
-haplotypes <- readRDS("data/haplotypesSNPs.RData")
+genMap <- readRDS("genMapSNPs.RData")
+haplotypes <- readRDS("haplotypesSNPs.RData")
 
 founderPop = newMapPop(genMap, 
                        haplotypes, 
@@ -16,16 +14,16 @@ SP$setSexes("yes_rand")
 
 ## randomly cross 200 parents 
 Parents = newPop(founderPop)
-F1 = randCross(Parents, 200)
+F1 = randCross(Parents, 200, nProgeny=30)
 
 ## self and bulk F1 to form F2 ##
 
-F2 = self(F1, nProgeny = 10)
+F2 = self(F1, nProgeny = 15)
 F2 = setPheno(F2)
 
 ## select top 100 individuals from F2 bulk and self to form F3
 F3Sel = selectInd(F2, 100, use="pheno", top=TRUE) 
-F3 = self(F3Sel, nProgeny=30)
+F3 = self(F3Sel, nProgeny=15)
 F3 = setPheno(F3)
 
 ##select top individuals within F3 families to form F4 ##
@@ -44,64 +42,66 @@ F5 = setPheno(F5)
 ## select top families from F5 for PYTs ##
 
 PYTSel = selectFam(F5, 16, use="pheno", top=TRUE) 
-PYT = self(PYTSel, nProgeny = 2)
+PYT = self(PYTSel, nProgeny = 4)
 PYT = setPheno(PYT, reps=2)
 
 # We will now advance elites to create an unstructured population
 
+cat("finished initial pop")
+
 newGen = self(PYT)
 
-nGen= sample(20:50, 1) # advance a random number of generations between 20 and 50
+nGen= sample(10:20, 1) # advance a random number of generations between 20 and 50
 x=1
 while (x < nGen){
-  newGen = self(newGen, nProgeny=5)
+  newGen = self(newGen, nProgeny=1)
   x = x+1
 }
 
+cat("finished selfing initial Elites")
+
+
 pops = list()
 npops = sample(3:7,1) # create a random number of subpopulations between 3 and 7
-selfGen = sample(50:100,1) # self the subpops for a random number of Gen between 50 and 100
-y=1
+selfGen = sample(5:10,1) # self the subpops for a random number of Gen between 50 and 100
 for (n in 1:npops)  {
-popname <- selectInd(newGen, 5)
+  y=1
+  popname <- selectInd(newGen, 5)
   while (y < selfGen){
-    popname = self(popname, nProgeny=10)
+    popname = self(popname, nProgeny=4)
     y=y+1
-    }
-pops[[n]] = assign(paste0("pop",n), popname)
+  }
+  pops[[n]] = assign(paste0("pop",n), popname)
 }
 
-newpoplist = list()
-nMigrations = sample(50:100,1) #select a random number of intermigrations
-for (m in 1:nMigrations){
-y = sample(1:npops,1) #randomly choose pop1
-z = sample(1:npops,1) #randomly choose pop2
-parents = selectInd(pops[[y]],3) #select migratin gparents
-parents2 = selectInd(pops[[x]],3) #select migrating parents  
-newpop = hybridCross(parents, parents2,) #cross migrating parents 
-newpoplist[[m]] = assign(paste0("newPop",m), newpop) #collect new pops in a list
-  }
+cat("finished creating subpops")
 
-finalpoplist = list()
-gen = sample(50:100,1) #self new pops for a random number of generations 
-g = 1
-p = 1
-while (p < npops){
-  pop = newpoplist[[p]]
-  popAdv = self(pop, nprogeny=5)
-  p = p+1
-  while (g < gen) {
-  popAdv = self(popAdv)
+
+newpoplist = list()
+nMigrations = sample(3:5,1) #select a random number of intermigrations
+nGen = sample(3:5,1)
+for (m in 1:nMigrations){
+  y = sample(1:npops,1) #randomly choose pop1
+  z = sample(1:npops,1) #randomly choose pop2
+  parents = selectInd(pops[[y]],3) #select migrating parents
+  parents2 = selectInd(pops[[z]],3) #select migrating parents  
+  newpop = hybridCross(parents, parents2,crossPlan="testcross") #cross migrating parents 
+  advance = self(newpop, nProgeny=15)
+  g = 1
+  while (g < nGen){
+    advance = self(advance, nProgeny=3)
     g = g+1
-    }
-  finalpoplist[[p]] = assign(paste0("finalpop",p),popAdv)
   }
+  newpoplist[[m]] = assign(paste0("newPop",m), advance) #collect new pops in a list
+}
+
+cat("finished intermigrations and advancing")
 
 trainX = list()
 trainY = list()
 z = 2
 while (z < npops){
-  getData = finalpoplist[[z]]
+  getData = newpoplist[[z]]
   geno = pullSegSiteGeno(getData)
   pheno = pheno(getData)
   trainX[[z]] = assign(paste0("genopop",z),geno)
@@ -109,8 +109,15 @@ while (z < npops){
   z = z+1
 }
 
-trainingGeno = do.call(rbind, trainX)
-trainingPheno = do.call(rbind,trainY)
+cat("finished pulling pop data")
 
-write_xlsx(trainingGeno,"trainingGeno.xlsx")
-write_xlsx(trainingPheno,"trainingPheno.xlsx")
+
+trainingGeno = as.data.frame(do.call(rbind, trainX))
+trainingPheno = as.data.frame(do.call(rbind,trainY))
+
+cat("writing files")
+
+write_xlsx(trainingGeno,"unstructuredGeno.xlsx")
+write_xlsx(trainingPheno,"unstructuredPheno.xlsx")
+
+cat("finished")
