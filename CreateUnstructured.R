@@ -1,3 +1,5 @@
+library(AlphaSimR)
+library(writexl)
 
 genMap <- readRDS("genMapSNPs.RData")
 haplotypes <- readRDS("haplotypesSNPs.RData")
@@ -99,8 +101,7 @@ cat("finished intermigrations and advancing")
 
 trainX = list()
 trainY = list()
-z = 2
-while (z < npops){
+for (z in 1:length(newpoplist)){
   getData = newpoplist[[z]]
   geno = pullSegSiteGeno(getData)
   pheno = pheno(getData)
@@ -121,3 +122,5 @@ write_xlsx(trainingGeno,"unstructuredGeno.xlsx")
 write_xlsx(trainingPheno,"unstructuredPheno.xlsx")
 
 cat("finished")
+
+
