@@ -1,5 +1,15 @@
 library(AlphaSimR)
 library(writexl)
+library(devtools)
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+library(cluster)
+library(factoextra)
+library(ggpubr)
+
+
+setwd("/Users/justin_folders/Desktop/Isabella_McGill_Files/GEBVs")
 
 genMap <- readRDS("genMapSNPs.RData")
 haplotypes <- readRDS("haplotypesSNPs.RData")
@@ -16,11 +26,11 @@ SP$setSexes("yes_rand")
 
 ## randomly cross 200 parents 
 Parents = newPop(founderPop)
-F1 = randCross(Parents, 200, nProgeny=30)
+F1 = randCross(Parents, 200)
 
 ## self and bulk F1 to form F2 ##
 
-F2 = self(F1, nProgeny = 15)
+F2 = self(F1, nProgeny = 4)
 F2 = setPheno(F2)
 
 ## select top 100 individuals from F2 bulk and self to form F3
@@ -53,24 +63,19 @@ cat("finished initial pop")
 
 newGen = self(PYT)
 
-nGen= sample(10:20, 1) # advance a random number of generations between 20 and 50
-x=1
-while (x < nGen){
-  newGen = self(newGen, nProgeny=1)
-  x = x+1
-}
-
-cat("finished selfing initial Elites")
-
-
 pops = list()
-npops = sample(3:7,1) # create a random number of subpopulations between 3 and 7
-selfGen = sample(5:10,1) # self the subpops for a random number of Gen between 50 and 100
+npops = 3 # create a random number of subpopulations between 3 and 7
+selfGen = sample(5:7,1) # self the subpops for a random number of Gen between 50 and 100
 for (n in 1:npops)  {
-  y=1
-  popname <- selectInd(newGen, 5)
+  popname <- selectInd(newGen, 128)
+  c = 1
+  while (c<nRand){
+  popname <- randCross(popname,20)
+  c = c +1
+  }
+  y = 1
   while (y < selfGen){
-    popname = self(popname, nProgeny=4)
+    popname = self(popname, nProgeny=3)
     y=y+1
   }
   pops[[n]] = assign(paste0("pop",n), popname)
@@ -80,34 +85,32 @@ cat("finished creating subpops")
 
 
 newpoplist = list()
-nMigrations = sample(3:5,1) #select a random number of intermigrations
-nGen = sample(3:5,1)
+nMigrations = npops #select a random number of intermigrations
+g = 10
 for (m in 1:nMigrations){
   y = sample(1:npops,1) #randomly choose pop1
   z = sample(1:npops,1) #randomly choose pop2
-  parents = selectInd(pops[[y]],3) #select migrating parents
-  parents2 = selectInd(pops[[z]],3) #select migrating parents  
+  parents = selectInd(pops[[y]],30) #select migrating parents
+  parents2 = selectInd(pops[[z]],30) #select migrating parents  
   newpop = hybridCross(parents, parents2,crossPlan="testcross") #cross migrating parents 
-  advance = self(newpop, nProgeny=15)
   g = 1
   while (g < nGen){
-    advance = self(advance, nProgeny=3)
+    newpop = self(newpop, nProgeny = 1)
     g = g+1
   }
-  newpoplist[[m]] = assign(paste0("newPop",m), advance) #collect new pops in a list
+  newpoplist[[m]] = assign(paste0("newPop",m), newpop) #collect new pops in a list
 }
 
-cat("finished intermigrations and advancing")
+cat("finished migrations")
 
 trainX = list()
 trainY = list()
-for (z in 1:length(newpoplist)){
+for (z in 1:npops){
   getData = newpoplist[[z]]
   geno = pullSegSiteGeno(getData)
   pheno = pheno(getData)
   trainX[[z]] = assign(paste0("genopop",z),geno)
   trainY[[z]] = assign(paste0("phenopop",z),pheno)
-  z = z+1
 }
 
 cat("finished pulling pop data")
@@ -116,11 +119,34 @@ cat("finished pulling pop data")
 trainingGeno = as.data.frame(do.call(rbind, trainX))
 trainingPheno = as.data.frame(do.call(rbind,trainY))
 
-cat("writing files")
+realData = readRDS("haplotypesSNPs.RData")
+haplo = as.data.frame(do.call(cbind, realData))
+colnames(haplo) = paste0("ID",1:ncol(haplo))
+colnames(trainingGeno) = paste0("ID",1:ncol(trainingGeno))
 
-write_xlsx(trainingGeno,"unstructuredGeno.xlsx")
-write_xlsx(trainingPheno,"unstructuredPheno.xlsx")
+M = rbind(trainingGeno, haplo)
 
-cat("finished")
+
+#visualize
+newgeno <- trainingGeno %>%  select(where(~ n_distinct(.) > 1))
+newgeno = scale(newgeno)
+colnames(newgeno) =NULL
+rownames(newgeno) = c(paste0("geno",1:nrow(newgeno)))
+
+# optimize K
+PCAgeno <- prcomp(newgeno, center=TRUE, scale=TRUE) ##take out categorical columns##
+PCAselected = as.data.frame(-PCAgeno$x[,1:3])
+silhouette <- fviz_nbclust(PCAselected, kmeans, method = 'silhouette')
+kvalues <- silhouette$data ##largest value tells how many clusters are optimal ##
+kvalues <- kvalues[order(-kvalues$y),]
+k=as.numeric(kvalues[1,1])
+
+# apply kmeans function and visualize
+k2 <- kmeans(newgeno, centers = k, nstart = 25)
+fviz_cluster(k2, data = newgeno,geom="point",ggtheme=theme_minimal(), ellipse = TRUE,
+             ellipse.type = "convex",
+             ellipse.level = 0.05,
+             ellipse.alpha = 0.2,
+             main = paste0("unstructured genotypes"))
 
 
