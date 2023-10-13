@@ -1,10 +1,29 @@
-class BayesianModel(PyroModule):
-    def __init__(self, in_size, out_size):
-       super().__init__()
-       self.bias = PyroSample( #PyroSample makes Bayesian
-           prior=dist.LogNormal(0, 1).expand([out_size]).to_event(1))
-       self.weight = PyroSample(
-           prior=dist.Normal(0, 1).expand([in_size, out_size]).to_event(2))
 
-    def forward(self, input):
-        return self.bias + input @ self.weight  # samples bias and weight
+# Create NN
+
+class NeuralNetwork(nn.Module):
+    def __init__(self, in_size, out_size):
+        super().__init__()
+        self.weight = nn.Parameter(torch.randn(in_size, out_size))
+        self.flatten = nn.Flatten()
+        self.bias = nn.Parameter(torch.randn(out_size))
+
+    def forward(self, x):
+        x = self.flatten(x)
+        logits = self.linear_relu_stack(x)
+        return logits
+
+model = NeuralNetwork(5,2)
+
+assert isinstance(model, nn.Module)
+assert not isinstance(model, PyroModule)
+
+## Convert to Pyro
+
+class Bayesian(NeuralNetwork, PyroModule):
+    pass
+
+model = Bayesian(5, 2)
+assert isinstance(model, nn.Module)
+assert isinstance(model, NeuralNetwork)
+assert isinstance(model, PyroModule)
