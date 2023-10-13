@@ -8,16 +8,23 @@ class NeuralNetwork(nn.Module):
     def __init__(self, in_size, out_size):
         super().__init__()
         self.weight = nn.Parameter(torch.randn(in_size, out_size))
+        self.bias = nn.Parameter(torch.randn(out_size))
+        self.linear_relu_stack = nn.Sequential(
+            nn.Linear(),
+            nn.ReLU(),
+            nn.Linear(),
+            nn.ReLU(),
+            nn.Linear()
+        )
+        super().__init__()
+        self.weight = nn.Parameter(torch.randn(in_size, out_size))
         self.flatten = nn.Flatten()
         self.bias = nn.Parameter(torch.randn(out_size))
-
-    def forward(self, x=None, y=None, seq_len=1):
         if x is None:
             with pyro.plate("x_plate", seq_len):
                 d_ = dist.Normal(torch.tensor([0.0]).to(self.device), torch.tensor([1.0]).to(self.device)).expand(
                     [self.num_features]).to_event(1)
                 x = pyro.sample("x", d_)
-
         out = self.model(x)
         mu = out.squeeze()
         softmax = torch.nn.Softmax(dim=1)
@@ -25,10 +32,24 @@ class NeuralNetwork(nn.Module):
             s = softmax(mu)
             obs = pyro.sample('obs', dist.Categorical(probs=s), obs=y).float()
 
+        return x, obs
+
 model = NeuralNetwork(5,2)
 
 assert isinstance(model, nn.Module)
 assert not isinstance(model, PyroModule)
+
+## Convert to Pyro
+
+class PyroLinear(NeuralNetwork, PyroModule):
+    pass
+
+model = PyroLinear(5, 2)
+assert isinstance(model, nn.Module)
+assert isinstance(model, NeuralNetwork)
+assert isinstance(model, PyroModule)
+
+
 
 ## parameters
 
@@ -86,3 +107,5 @@ model = Bayesian(5, 2)
 assert isinstance(model, nn.Module)
 assert isinstance(model, NeuralNetwork)
 assert isinstance(model, PyroModule)
+
+>>>>>>> 347948cdcfb1f3ca454975b84ad84a4323836040
