@@ -98,8 +98,8 @@ for t in range(epochs):
     test(test_dataloader, model, loss_fn)
 print("Done!")
 
-## Ccnvert to Pyro
 
+## Convert to Pyro
 class Bayesian(NeuralNetwork, PyroModule):
     pass
 
@@ -107,5 +107,3 @@ model = Bayesian(5, 2)
 assert isinstance(model, nn.Module)
 assert isinstance(model, NeuralNetwork)
 assert isinstance(model, PyroModule)
-
->>>>>>> 347948cdcfb1f3ca454975b84ad84a4323836040
